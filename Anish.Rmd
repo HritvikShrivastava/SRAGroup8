@@ -6,25 +6,49 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+
+
+
+
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+library(mgcv)
+library(vegan)
+
+# Load the datasets
+coral_bleaching_data <- read.csv('data/drive-download-20240711T211807Z-001/coral bleaching knb-lter-mcr.4_1_20240105 (1).csv')
+fish_counts_data <- read.csv('data/drive-download-20240711T211807Z-001/fish MCR_LTER_Annual_Fish_Survey_20230615.csv')
+
+# Preview the data
+head(coral_bleaching_data)
+head(fish_counts_data)
+
+# Pivot the fish counts data to wide format
+fish_counts_wide <- fish_counts_data %>%
+  pivot_wider(names_from = Taxonomy, values_from = Count, values_fill = list(Count = 0))
+
+# Calculate the Shannon Diversity Index for each site and date
+fish_biodiversity <- fish_counts_wide %>%
+  rowwise() %>%
+  mutate(Shannon_Index = diversity(c_across(-c(Site, Date)), index = "shannon")) %>%
+  select(Site, Date, Shannon_Index)
+
+# Ensure the date formats match in both datasets
+coral_bleaching_data$Date <- as.Date(coral_bleaching_data$Date, format = "%Y-%m-%d")
+fish_biodiversity$Date <- as.Date(fish_biodiversity$Date, format = "%Y-%m-%d")
+
+# Merge datasets
+compiled_data <- merge(coral_bleaching_data, fish_biodiversity, by = c("Site", "Date"))
+
+# Fit a GAM
+gam_model <- gam(Shannon_Index ~ s(Coral_Bleaching_Rate), data = compiled_data)
+
+# Summary of the GAM
+summary(gam_model)
+
+# Plot the GAM
+plot(gam_model, main = "Relationship between Coral Bleaching and Fish Biodiversity")
+
 ```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
